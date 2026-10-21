@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = 'shravanipatwardhan'
         IMAGE_NAME = 'shravanipatwardhan/student-management-system'
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
@@ -22,7 +22,11 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest .'
+                sh '''
+                    docker build \
+                      -t ${IMAGE_NAME}:${BUILD_NUMBER} \
+                      -t ${IMAGE_NAME}:latest .
+                '''
             }
         }
 
@@ -37,7 +41,8 @@ pipeline {
                 ]) {
                     sh '''
                         set +x
-                        echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin
+                        echo "$DOCKER_TOKEN" | docker login \
+                          -u "$DOCKER_USER" --password-stdin
                     '''
                 }
             }
@@ -52,16 +57,32 @@ pipeline {
             }
         }
 
-        
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                    set -e
+
+                    kubectl set image deployment/student-management \
+                      student-management=${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    kubectl rollout status deployment/student-management \
+                      --timeout=120s
+
+                    kubectl get deployment student-management
+                '''
+            }
+        }
     }
 
     post {
         always {
             echo 'CI/CD pipeline execution finished.'
         }
+
         success {
-            echo 'Build, image publishing, and deployment completed successfully.'
+            echo 'Build, image publishing, and Kubernetes deployment completed successfully.'
         }
+
         failure {
             echo 'Pipeline failed. Check the stage logs for details.'
         }
