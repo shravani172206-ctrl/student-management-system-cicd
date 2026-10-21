@@ -52,15 +52,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                    kubectl set image deployment/student-management \
-                      student-management=${IMAGE_NAME}:${BUILD_NUMBER}
-                    kubectl rollout status deployment/student-management --timeout=120s
-                '''
-            }
-        }
+        
     }
 
     post {
