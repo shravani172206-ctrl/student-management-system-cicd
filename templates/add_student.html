@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Student</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        .container {
+            padding: 40px;
+            max-width: 600px;
+            margin: auto;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            text-align: center;
+            color: #641382;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        input, select {
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #380d5e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            position: relative;
+        }
+
+        button.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        button.loading::after {
+            content: "";
+            position: absolute;
+            right: 15px;
+            width: 18px;
+            height: 18px;
+            border: 3px solid white;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            margin-top: 15px;
+            font-weight: bold;
+            text-align: center;
+            transition: opacity 1s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo"><h3>Student Management</h3></div>
+        <ul class="nav-links">
+            <li><a href="/">Dashboard</a></li>
+            <li><a href="/students">Students</a></li>
+            <li><a href="/add_student">Add Student</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <h2>Add New Student</h2>
+
+        <form id="add-student-form">
+
+            <label for="name">Name:</label>
+            <input type="text" id="name" required minlength="3" placeholder="Enter full name">
+
+            <label for="roll">Roll Number:</label>
+            <input type="text" id="roll" required placeholder="e.g., 21CO45">
+
+            <label for="branch">Branch:</label>
+            <select id="branch" required>
+                <option value="">Select Branch</option>
+                <option>Computer</option>
+                <option>IT</option>
+                <option>Mechanical</option>
+                <option>Civil</option>
+                <option>ENTC</option>
+            </select>
+
+            <label for="year">Year:</label>
+            <select id="year" required>
+                <option value="">Select Year</option>
+                <option>FE</option>
+                <option>SE</option>
+                <option>TE</option>
+                <option>BE</option>
+            </select>
+
+            <button type="submit" id="submit-btn">Add Student</button>
+        </form>
+
+        <div class="message" id="message"></div>
+    </div>
+
+
+    <script>
+        const form = document.getElementById("add-student-form");
+        const messageDiv = document.getElementById("message");
+        const submitBtn = document.getElementById("submit-btn");
+
+        // Fade out message after 3 sec
+        function fadeMessage() {
+            setTimeout(() => {
+                messageDiv.style.opacity = "0";
+            }, 3000);
+        }
+
+        // Check duplicate roll before submitting
+        async function rollExists(roll) {
+            const res = await fetch('/api/students');
+            const students = await res.json();
+            return students.some(s => s.roll.toLowerCase() === roll.toLowerCase());
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById("name").value.trim();
+            const roll = document.getElementById("roll").value.trim();
+            const branch = document.getElementById("branch").value;
+            const year = document.getElementById("year").value;
+
+            // Front-end validation
+            if (name.length < 3) {
+                messageDiv.style.color = "red";
+                messageDiv.textContent = "Name must be at least 3 characters.";
+                return fadeMessage();
+            }
+
+            if (!/^[0-9A-Za-z]+$/.test(roll)) {
+                messageDiv.style.color = "red";
+                messageDiv.textContent = "Roll number must be alphanumeric.";
+                return fadeMessage();
+            }
+
+            // Duplicate roll check
+            if (await rollExists(roll)) {
+                messageDiv.style.color = "red";
+                messageDiv.textContent = "Roll number already exists!";
+                return fadeMessage();
+            }
+
+            const studentData = { name, roll, branch, year };
+
+            try {
+                submitBtn.classList.add("loading");
+
+                const response = await fetch("/api/students", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(studentData)
+                });
+
+                const result = await response.json();
+                submitBtn.classList.remove("loading");
+
+                if (response.status === 201) {
+                    messageDiv.style.color = "green";
+                    messageDiv.style.opacity = "1";
+                    messageDiv.textContent = "Student added successfully!";
+
+                    form.reset();
+                    fadeMessage();
+                } else {
+                    messageDiv.style.color = "red";
+                    messageDiv.textContent = result.error;
+                    fadeMessage();
+                }
+
+            } catch (error) {
+                messageDiv.style.color = "red";
+                messageDiv.textContent = "Error connecting to server";
+                fadeMessage();
+            }
+        });
+
+        function addStudent() {
+            const name = document.getElementById('studentName').value.trim();
+            const roll = document.getElementById('studentRoll').value.trim();
+            const branch = document.getElementById('studentBranch').value;
+            const year = document.getElementById('studentYear').value;
+
+            if (!name || !roll || !branch || !year) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            fetch('/api/students', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    roll: roll,
+                    branch: branch,
+                    year: year
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message) {
+                    alert('Student added successfully!');
+                    window.location.href = '/students';
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to add student'));
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+        }
+    </script>
+
+</body>
+</html>
